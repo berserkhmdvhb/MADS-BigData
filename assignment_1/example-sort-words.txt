@@ -1,8 +1,0 @@
-write    4
-writer    5
-writers    3
-writing    3
-written    8
-wrote    9
-yards    12
-year    17
