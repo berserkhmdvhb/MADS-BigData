@@ -1,0 +1,52 @@
+Problem_3:
+-------------
+This file gives explanations on the modifications of the SparkTwitterCollector
+object.
+
+The modifications are divided into three subtasks:
+
+(1) Collect the hashtags from a one minute stream of tweets.
+
+For this, we first defined our REGEX pattern as a broadcast variable.
+(Pattern:"^#[A-Za-z0-9]* )
+
+(2) Use the RDD transformations from the WordCount example 
+to get the frequency of hashtags. 
+
+As we create an RDD for each defined interval, we use the transformation
+properties to each RDD to get an RDD of hashtags that match our desired pattern,
+which in turn is further transformed to get the counts and sorted counts.
+
+We will modify the interval and timeout to our needs when running the
+script on the command line.
+
+(3) Get the frequency of the hashtag pairs that co-occur within a tweet.
+
+In order to extract those pairs, we need to pay attention to extract pairs
+within ONE tweet, not from all the tweets.
+We create RDDs which contain the hashtags with the desired pattern, and we
+run a MapReduce job where we pair the hashtags with their count in the following format:
+
+(#1:#2,count)
+
+We will ony consider the top 1000 most frequent hashtag pairs.
+
+
+
+The outputs are produced in the following way:
+- raw tweets -> outputDirectory/tweets_TIMESTAMP
+- just hashtags -> outputDirectory/hashtags_TIMESTAMP
+- sorted hashtags -> outputDirectory/hashtags_sortedByCount_TIMESTAMP
+- sorted pairs -> outputDirectory/hashtag_pairs_TIMESTAMP
+
+In order to get a one-minute snapshot and have only 4 outputs (as indicated above),
+please set the interval time to 60s and the timeout such that 60 <= timeout < 120.
+
+From our test runs, one sees that hashtags give an impression of current trends, since
+the most occurring hashtags are either related to politics or technologies such as
+anything crypto and the associated NFTs. Moreover, it is interesting to see that no one pair
+could be said to be truly common, indicating that the usage of hashtag pairs, at least
+judging by a short 1 min snapshot, is highly individual; frequent individual hashtags
+pertaining to the same subject do not necessarily lead to frequent pairs.
+
+On a final note, judging by some other hashtags, people are kind of nasty...

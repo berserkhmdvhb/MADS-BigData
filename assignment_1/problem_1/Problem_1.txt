@@ -1,0 +1,171 @@
+Problem 1:
+------------
+
+This file contains explanations on the methods we used to get the desired outputs in the different subtasks
+for the Hadoop MapReduce tasks.
+
+Heads-up: we have modified the HadoopWordPairs and HadoopWordStripes classes in such a way that
+m is passed as a command line argument. Hence, it necessary to pass eg 1 as the last argument
+when running the program to have the case m=1, otherwise a Nullpointer exception will occur
+due to a command line argument missing.
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Subtask (a): 
+
+In order to obtain the desired outputs for the modified classes
+we used the appropriate REGEX patterns: 
+(namely: lowercase words with "-", "_" and numbers with "." allowed)
+Note that from the phrasing of the exercise, it was not clear that one should
+have first converted all the tokens to lowercase as we will do in problem 2.
+
+For this we used the following Java-Utils:
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+
+For the HadoopWordCount class, we used a combined REGEX pattern to filter the words and numbers:
+
+"(?!^[A-Z-_])(?>[a-z-_]*)|(?<=^| )\\d+(\\.\\d+)?(?=$| )|(?<=^| )\\.\\d+(?=$| )" 
+(Note that we need to escape backslashes "\" by adding another "\")
+The first group of regex pattern remove words starting with uppercase letters or dash or underscore. The second group allows only dash, underscore and lowercase letters. All rest after "|" are responsible for allowing only digits with the possible existence of at most one ".". The "|" means allowing either what is before it, or what is after it. 
+
+As we want to get two different output files (one for the words and one for the numbers),
+we used a Partitioner-class, where we redefine the REGEX patterns, but using the Pattern
+for words and numbers seperately.
+
+These are given by the following:
+
+Words pattern: "[a-z-_]*"
+Numbers pattern: "(?<=^| )\\d+(\\.\\d+)?(?=$| )|(?<=^| )\\.\\d+(?=$| )"
+
+The Partitioner-class allows for creating two outputfiles, which in our case 
+is one for each of the defined patterns. 
+ _____________________________________________________________________________
+ | Commentary on two reducers vs multiple reducers:                           |
+ | The fact that creating two outputfiles to have a more accessible result    |
+ | from the MapReduce jobs means that we slow down the process, which         |
+ | initially created way more outputfiles, i.e., one output file per pattern  |
+ | perreducer. In our case, this then would have yielded 2*#reducers output   |
+ | files. This does, however, defeat the purpose of distributed computing.*   |
+ |____________________________________________________________________________|
+* we understand that it makes inspecting our submission that much easier, we
+just thought it might be this would be a noteworthy commentary.
+
+
+In order to sort the output by count, we used the properties of dataframes in R to sort it
+by the "count" column, and then saved the file in *.csv-format. We are aware that the
+implementation of a second MapReduce job to sort the outputs would have worked as well, and
+might have been more aligned with the use of the Hadoop API. However, please have a look into
+our provided R script (written as a R Markdown document) to sort the output and adjust the paths accordingly.
+
+
+These methods are also applied to the HadoopWordPairs.java and HadoopWordStripes.java
+classes, such that we only get outputs for the matching patterns, for both the pairs 
+and stripes.
+
+For the pairs, we added a separate class called HadoopWordPairs_partitioned, where we split the
+output into three different files:
+- (word, word) pairs
+- (number, number) pairs
+- mixed pairs 
+
+
+You can use the following pattern to call this class, adjusting the paths as needed:
+hadoop jar ./problem_1/HadoopWordCount.jar HadoopWordPairs_partitioned ../../../enwiki-articles/AA
+./hadoop-output2_partitioned1 2
+the last argument indicates m=2
+
+
+
+----------------------------------------------------------------------------------------------------
+
+Subtask (b):
+
+As we used the same REGEX patterns as under (a), we adapted the range of neighbouring words/numbers
+we look at to create the pairs, as well as the stripes.
+Here we defined the condition in the nested loops that if the first word matches our pattern, then
+we look for the neighbouring words (of order m).
+
+For the the Stripes-class:
+
+To reduce the numbers of calls to the matches()-method, we first create
+a boolean array recording for each token in the currently considered line whether
+it fits our defined pattern. Then, it is a simple array look-up, which is more
+efficient than calling the matches()-method on every token in every loop. Then,
+the outer loop proceeds through the tokens, only going to the inner loop if the
+token matches the defined pattern. In the inner loop, we inspect the m left- and
+m right-hand side neighbours, recording them in the stripe for the current token
+if they match the pattern.
+
+
+For the Pairs-Class:
+
+Here we used the same strategy as in the stripes example, only that the
+the output format is a different one. Again, the pattern check is applied twice,
+one time for checking if the current word is matching the pattern, and the second
+time to check if the neighbouring words (up to distance m) also match the pattern. In contrast
+to the stripes, however, we only look up the m right-hand side neighbours.
+----------------------------------------------------------------------------------------------------
+
+Subtask (c):
+
+The runtimes were measured using the System.nanoTime() functionality provided in Java.
+Furthermore, the tasks were performed on the IRIS cluster, using a single node, a single
+task per node, and 4 cpus per task. The resource allocation was done using the following command:
+si -N1 -n1 -c4 --time=1:00:00
+
+We passed multiple input folders using "path/to/enwiki-articles/{AA,AB,AC}" as input.
+
+WORDCOUNT
+AA          -      18s
+AA,AB       -      36s
+AA,AB,AC    -      49s
+AA,AB,AC,AD - 1min 27s
+
+WORDPAIRS (m=5)
+AA          -      49s
+AA,AB       - 1min 40s
+AA,AB,AC    - 2min 33s
+AA,AB,AC,AD - 3min 44s
+
+WORDSTRIPES (m=5)
+AA          - 1min 35s
+AA,AB       - 3min 16s
+AA,AB,AC    - 4min 59s
+AA,AB,AC,AD - 6min 23s
+
+
+----------------------------------------------------------------------------------------------------
+
+Subtask (d):
+
+The runtimes were measured using the System.nanoTime() functionality provided in Java.
+Furthermore, the tasks were performed on the IRIS cluster, using a single node, a single
+task per node, and 4 cpus per task. The resource allocation was done using the following command:
+si -N1 -n1 -c4 --time=1:00:00
+
+WORDPAIRS
+m=1  -      19s
+m=5  -      51s
+m=10 - 1min 26s
+
+WORDSTRIPES
+m=1  -      58s
+m=5  - 1min 43s
+m=10 - 2min 19s
+
+----------------------------------------------------------------------------------------------------
+Observations concerning the runtimes
+Both tests show approx. linear increases in their runtime.
+
+
+###########
+Difference between the two scalability tests (concerning linear scalability)
+The first test in task (c) increases the size of the input, while the test in task (d) increases
+the number of operations performed on each input. The first test however would show constant
+computing time if one were to increase the number of worker nodes (and not bottleneck
+everything into only two reducers as alluded to above) at the same ratio as the input size is increased.
+For the second case, however, the added passes over each input is - at least in our implementation -
+inherent to each worker, such that the computing time inevitably increases.

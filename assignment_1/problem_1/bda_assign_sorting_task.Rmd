@@ -1,0 +1,41 @@
+---
+title: "BDA-Assign1-Sorting-Task"
+author: "Max Sinner"
+date: '2022-04-07'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Sorting Task
+
+This R-script will sort the outputs (lowercase words and numbers) by count from our MR-jobs in Hadoop.
+We will first give an example on how to read in a txt file into a dataframe or tibble, sort the given data by the "count" column and finally save them again in a text file. 
+
+```{r}
+library(tidyverse)
+
+numbers <- read.table("example-sort.txt")
+  
+words <- read.table("example-sort-words.txt")
+
+numbers_df <- tidyr::separate(numbers, col = 1, into = "key" , sep = " ⁠")
+
+words_df <- tidyr::separate(words, col = 1, into = "key", sep = " ")
+
+arrange(numbers_df, desc(V2)) -> numbers_srtd
+
+arrange(words_df, desc(V2)) -> words_srtd
+
+#arrange(words_db, -desc("V2"))
+
+numbers_srtd
+
+words_srtd
+
+write.csv(numbers_srtd, file ="numbers_srtd.txt", sep = " ")
+write.csv(words_srtd, file = "words_srtd.txt", sep =" ")
+
+```

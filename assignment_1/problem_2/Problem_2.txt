@@ -1,0 +1,100 @@
+Problem 2:
+--------------
+
+Instead of giving explanations per subtask as in Task 1,
+we will first explain the features of the code after modifiying it to the point
+where we solved subtasks (a)-(c). Then, we will address the individual talking points.
+
+Subtasks (a)/(b)/(c):
+
+We modified the SparkWordCount.scala object using the same REGEX patetrns
+as in the *.java-classes to extract the desired words and numbers.
+
+This time however, we defined multiple functions that help us
+to get the desired output:
+
+1) is_stopword-Function:
+This function will be used to get rid of the words in the stopwords.txt-file.
+
+2) is_word-Function:
+This function allows us to apply the regex pattern for the words
+that need to be extracted.
+The used pattern is the following: "[a-z-_]*"
+
+3) is_nbr-Function:
+Similar to the is_word-Function, used to extract the numbers:
+REGEX pattern: "\\d+(\\.\\d+)?(?=$| )|(?<=^| )\\.\\d+(?=$| )"
+
+Another feature that can be exploited in Spark is the RDD API,
+which allows for transformations such as map, flatmap, and filters.
+Using these dataset operations, we can transform one RDD to an RDD
+containing our desired patterns, such as to transform all words to lowercase,
+filter using the REGEX patterns and even for sorting the numbers and words by value.
+
+We use sequential transfromations of RDDs to obtain the sorted
+numbers and words, which are in the end saved in two different
+outputs.
+
+
+We furthermore added a line enabling for an input folder to be fed recursively,
+such that we can pass the enwiki-articles folder and the program will then go through
+its subfolders.
+
+--------------------------------------------------------------------------------------
+
+Subtask (d)
+
+Under Subtask (d), the code only differs in the definition of the 
+stopwords, which is now introduced as a broadcast variable, instead of sending the
+data along with every task, which reduces communication costs.
+The broadcast variable is cached instead of copied for every task.
+
+
+Our source files are split into three:
+-SparkWordCount.scala: In this file, we simply implement the filter functions is_word and
+is_nbr as described above
+-SparkWordCount_c.scala: here, we add a further filter function is_stopword, using the
+provided list of stopwords in a closure
+-SparkWordCount_d.scala: instead of a closure, the list of stopwords is propagated as a
+broadcast variable
+
+after compiling the source files, please use:
+spark-submit --class SparkWordCount_X path/to/SparkWordCount.jar ../../../enwiki-articles/
+./spark-output1_X path/to/stopwords.txt
+where SparkWordCount_X is one of the following:
+SparkWordCount, SparkWordCount_c, SparkWordCount_d
+
+---------------------------------------------------------------------------------------
+subtask (a) explained above
+
+subtask (b)
+We obtained the following runtime running the program on a local machine:
+1min 50s
+As in Problem_1, we measured the runtime using the nanoTime functionality provided by the
+standard library.
+One major difference to our output from Problem 1 is that we understood the patterns to
+extract differently. In fact, for problem 1, we filtered out anything that did not match 
+the pattern of "lowercase word, including dashes and underscores", whereas in this problem,
+we did what was explicitly stated, i.e., transform all tokens to lowercase first before
+applying the defined filter functions. The output for the numbers are the same, except for
+the fact that here, we have only taken the 1000 most frequent ones. We could also confirm
+the faster in-memory performance that Spark enables: going through the whole enwiki-articles
+directory was not much slower than going through only four of the subdirectories for the
+wordcount in Hadoop. One reason for this could of course in our case be the fact that we
+are effectively hamstringing our program in Problem 1 by having everything go through only
+two reducers at the end.
+
+subtask (c)
+not much to say, see subtask (d)
+We had the following runtime: 1min 58s
+
+subtask (d)
+runtime: 2min 40s
+
+Interestingly enough, the use of a broadcast variable has slowed the execution time of the
+program quite a bit compared to the use of closures, despite broadcast variables cutting
+down on the communication overhead required by the closure approach (since in the latter
+case, the variable would need to be shipped to every node with every closure). One potential
+explanation for this might be the fact that we ran the test on a single machine, forgoing
+any sort of distributed computation, with the single worker then adding computation time
+through constant (de-)serialization of the broadcast variable.
