@@ -1,0 +1,174 @@
+############################################################################################
+Big Data Analytics - Assignment 2
+
+Group 3:
+    Tom Deckenbrunnen
+    Max Sinner
+    Hamed Vaheb
+
+Problem 3
+
+
+Notes concerning our source files:
+We provided all our source files as scripts for the spark-shell, which
+is also the way that we executed them. All the source files are done
+in such a way that the individual subtasks can be ran by using just the
+code from the respective source file, ie. the necessary code from
+subtask (a) is also included in the file for subtask (b).
+
+This is the cluster configuration we used for this task:
+srun -p batch --time=0XX:00:0 -N 2 -c 12 --pty bash -i
+############################################################################################
+Subtask (a)
+#######################################
+sub-subtask (i)
+##################
+We first map each rating to a pair (user, artist), then perform
+countByKey, which gives us an RDD containing the amount of
+distinct artist counts for each user.
+We user this RDD to filter out from the trainData all those ratings
+that do not come from a user qualifying our requirement of at least
+100 distinct artists. 
+A count of the distinct users in this RDD does indeed give the correct
+amount of users.
+
+##################
+sub-subtask (ii)
+##################
+We first create an RDD containing pairs (user, [Ratings]), where
+we collect for each user all of the ratings.
+Then, create an RDD containing the splits per user. (Thank you to
+Prof. Theobald for providing an easy method on Moodle. All attempts
+at using randomSplit here either violated sparkcontext or resulted
+in an exceeding of the overhead limit when performing an union of
+RDDs)
+This is followed by a flatMap combining the respective splits into
+trainData90 and trainData10.
+Then, a model is trained on trainData90 using the parameters as used
+in the RunRecommender-shell.scala file from Moodle. 
+
+##################
+sub-subtask (iii)
+##################
+Here, we use the snippets of code provided on Moodle and adapt it to
+the amount of users and recommendations, ie #u = 100, #rec = 25.
+For the trained model we get:
+AUC = 0.576
+For the baseline model:
+AUC = 0.53
+
+Underwhelming values... This points to a possibly weak combination of
+rank, lambda, alpha.
+
+
+
+The overall runtime of this task is:
+
+9 min 14 s 
+
+############################################################################################
+Subtask (b)
+#######################################
+The validation folds for the crossvalidation are created by performing
+a randomsplit with weights (0.2,0.2,0.2,0.2,0.2).
+The trainingfolds are further created for each validation fold by
+combining the k-1 other validation folds.
+
+Since this would not guarantee that all users from the validation fold
+are included in the respective training fold, we choose to use users
+from the testData100, but use 5 different sets of users for each fold.
+These validation sets are, however, kept the same for each combination
+of hyperparameters. We are aware that this does have the risk of
+overfitting to these particular users and is not the best method to
+generalize.
+
+We then record the wanted metrics in a similar manner as before.
+(Due to time constraints, we did not manage to include precision
+and recall, unfortunately). We furthermore had to use a reduced
+amount of users and recommendations, ie #users = 10,
+#recommendations = 10, since the computation of the predictionAndLabels
+RDD was the most time consuming step which prevented us from fully
+running the whole task as required. We have performed small tests
+to check which parameters affected runtime the most and the size
+of the dataset we used had less impact than as mentioned the
+amount of users and recommendations we use for testing.
+
+
+We were not able to properly finish computation because upon the
+realisation that it would not work with the required amount of users
+and recommendations per user, there was not enough time to perform
+the crossvalidation with reduced parameters, either. Sorry about that.
+
+
+As mentioned, we could not get a completed runtime. However, we can
+say that the full crossvalidation with 100 users per test set and
+25 recommendations per user, it would have taken over 10h.
+
+############################################################################################
+Subtask (c)
+#######################################
+
+We chose the following artists:
+ID       | Artist
+10273820   Ne Obliviscaris
+1010227	   Amon Amarth
+6825344	   Machine Head
+2121555	   Volbeat
+10026633   Rammstein
+7029024	   Cynic
+1283438	   Pink Floyd
+1212435	   Gojira
+1016114	   Insomnium
+2152973	   Agalloch
+
+We then create the following ID that has not been used before:
+1111119
+
+The ratings for the artists are created randomly and have values
+between 50 and 200. Our user listens to the same artists quite a
+bunch.
+
+Since the runtime for subtask (b) did not let us finish in time
+to extract the best combination of hyperparameters, we made an
+(un-)educated guess:
+rank = 25
+lambda = 0.01
+alpha = 1.0
+
+We then trained a model with these parameters on the whole
+trainData including our new ratings.
+
+These were the 25 top recommendations the model provided:
+Opeth                                                                           
+In Flames
+Slayer
+Megadeth
+Pantera
+Children of Bodom
+Cradle of Filth
+Iron Maiden
+Dimmu Borgir
+Metallica
+Dark Tranquillity                                                               
+Soilwork
+Arch Enemy
+Sepultura
+Dream Theater
+Anathema
+Katatonia
+Meshuggah
+Strapping Young Lad
+System of a Down
+Death
+Iced Earth
+Black Sabbath
+Lamb of God
+Tool
+
+
+These are all bands that the user has either actively listened/listens
+to or seen live and enjoyed themself. So our recommender model is spot
+on with the recommendations for this particular user.
+
+The runtime for this subtask is:
+1 min 32 s

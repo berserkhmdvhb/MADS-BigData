@@ -1,0 +1,165 @@
+////imports////
+
+import org.apache.spark.mllib.linalg._
+import org.apache.spark.mllib.tree._
+import org.apache.spark.mllib.tree.model._
+import org.apache.spark.rdd._
+import org.apache.spark.mllib.evaluation._
+import org.apache.spark.ml.linalg.{Vector, Vectors}
+import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.classification.{RandomForestClassificationModel, RandomForestClassifier}
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.feature.{FeatureHasher, IndexToString, StringIndexer, VectorIndexer}
+import org.apache.spark.mllib.util.MLUtils
+//hyperparams import
+import org.apache.spark.sql.Row
+import org.apache.spark.ml.tuning.{CrossValidator,ParamGridBuilder}
+import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
+import org.apache.spark.mllib.evaluation.{BinaryClassificationMetrics, MulticlassMetrics}
+
+
+/////////PHASE 0: PREPARATION////////////
+//read data
+//val sampleSize = 0.01 // use 1 percent sample size for debugging!
+//val sampleSize = 0.001 // use 1 percent sample size for debugging!
+val df = spark.read.option("inferSchema", true).option("header", true).csv("/home/users/hvaheb/datasets/heart_2020_cleaned.csv")
+
+//size and outline of dataframe
+df.count()
+
+//start timing the code
+val start = System.nanoTime()
+
+///////PHASE I: TRANSFORMERS and ESTIMATORS////////
+
+///1.1 TRANSFORMERS////
+
+// filter feature variables
+val features = df.columns.filter(! _.contains("HeartDisease"))
+
+
+
+// feature hashing projects a set of categorical or numerical features
+// also it applied one-hot encoder on categorical variables
+// we also want to add index to columns to serve as a metatada for the columns
+val hasher = new FeatureHasher().setInputCols(features).setOutputCol("indexedFeatures").setNumFeatures(32768)
+
+
+
+// Index labels, adding metadata to the label column.
+val labelIndexer = new StringIndexer().setInputCol("HeartDisease").setOutputCol("label").fit(df)
+
+
+
+
+//1.2 ESTIMATORS////
+
+
+// split dataframe to train and test
+val Array(trainData, testData) = df.randomSplit(Array(0.9, 0.1))
+trainData.cache()
+testData.cache()
+
+// define the model
+val rf = new RandomForestClassifier().setLabelCol("label").setFeaturesCol("indexedFeatures")
+
+
+///////PHASE II: Train, Test, Evaluate////
+
+// create a pipeline comprising elements form Phase I, i.e.,
+// chain transformers(indexers) and estimators(DecisionTreeClassifier) in a Pipeline
+val stages = Array(hasher, labelIndexer, rf)
+val pipeline = new Pipeline().setStages(stages)
+
+
+val models = pipeline.fit(trainData)
+//val predictions = models.transform(testData)
+
+// print logic and decision structure of random forest
+//val rfModel = model.stages(2).asInstanceOf[RandomForestClassificationModel]
+//println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
+
+
+///////PHASE III: Hyper-parameter Tuning////
+/// create the last element of pipeline, which is a 5-fold cross-validation on a
+/// hyperparameter grid space
+val evaluatorBin = new BinaryClassificationEvaluator()
+val paramGrid = new ParamGridBuilder().addGrid(rf.numTrees, 5::10::20::Nil).addGrid(rf.impurity, "gini"::"entropy"::Nil).addGrid(rf.maxBins, 50::100::300::Nil).addGrid(rf.maxDepth, 10::20::30::Nil).build()
+//val paramGrid = new ParamGridBuilder().addGrid(dt.impurity, "gini"::"entropy"::Nil).build()
+val cv = new CrossValidator().setEstimator(pipeline).setEstimatorParamMaps(paramGrid).setNumFolds(5).setEvaluator(evaluatorBin)
+
+//fit the cross-validation model
+val cvModel = cv.fit(trainData)
+
+
+// make sure that we have the desired number of folds
+cvModel.getNumFolds
+
+
+// make predictions on test data. cvModel uses the best model found
+val predictionsCV = cvModel.transform(testData)
+
+//remove unwanted columns from prediction
+val unwantedColumnsCV = predictionsCV.columns.filter (x => x != "label" & x != "indexedFeatures" & x!= "prediction" & x!= "rawPrediction" & x != "probability")
+val predictionsCVClean = predictionsCV.drop(unwantedColumnsCV: _*)
+
+
+//save the best model on the specified path
+val path = "/home/users/hvaheb/bds/bda/exercises/2/out/"
+val modelPath = path + "/model_rfc"
+cvModel.write.overwrite().save(path=modelPath)
+
+
+// report accuracy
+
+//simple counting 
+
+testData.filter(testData("HeartDisease")==="Yes").select("HeartDisease").count()
+
+val condition =  col("prediction") >= 1 && col("prediction") <= 1
+val heartDisease_df = predictionsCVClean.filter(condition).select("prediction").count()
+// "accuracy" metrics is not defined in the class "BinaryClassificationMetrics"
+// so I was coerced to use the "MulticlassClassificationEvaluator" class again for this metric
+val evaluator = new MulticlassClassificationEvaluator().setLabelCol("label").setPredictionCol("prediction").setMetricName("accuracy")
+val accuracy = evaluator.evaluate(predictionsCVClean)
+println(s"Test Error = ${(1.0 - accuracy)}")
+
+// report other metrics of error
+// create pairs of (prediction, label) from "predcition" and "pair" columns
+val temp = predictionsCVClean.select("label","prediction")
+val temp2 = temp.rdd.map(x => (x.get(0), x.get(1))).collect()
+
+// Instantiate metrics object
+val predictionAndLabels = sc.parallelize(temp2)
+val PAL = predictionAndLabels.map(x => (x._1.toString.toDouble, x._2.toString.toDouble))
+val metrics = new BinaryClassificationMetrics(PAL)
+
+// AUC-ROC Curve
+metrics.areaUnderROC
+metrics.areaUnderPR
+
+// Precision by threshold
+val precision = metrics.precisionByThreshold
+precision.collect.foreach { case (t, p) =>
+  println(s"Threshold: $t, Precision: $p")
+}
+
+// Recall by threshold
+val recall = metrics.recallByThreshold
+recall.collect.foreach { case (t, r) => println(s"Threshold: $t, Recall: $r")}
+
+// Precision-Recall Curve
+val PRC = metrics.pr
+PRC.collect().foreach(println)
+
+
+
+//calculate runtime
+val stop = System.nanoTime()
+val diff_in_s = (stop - start) / 1e9d
+val secs = (diff_in_s % 60).toInt
+val mins = ((diff_in_s / 60.0) % 60).toInt
+Console.println(s"Elapsed time: ${mins} min ${secs} s")
+

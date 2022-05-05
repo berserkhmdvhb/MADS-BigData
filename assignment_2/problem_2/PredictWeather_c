@@ -1,0 +1,40 @@
+
+
+
+///subtask(c): AccuWeatherPrediction////
+
+// apply the parse function on data
+val rawNOAA = sc.textFile("/home/users/hvaheb/datasets/NOAA-recent/NOAA-065900/")
+
+val parsedNOAA = parse(rawNOAA)
+
+// convert rdd to dataframe, which gives us one column with rows which are stacked (wrapped) array that are
+// obtained from the parsing function
+val df_raw = parsedNOAA.toDF()
+
+// now we unstack the array by creating meaningful columns with corresponding datatype
+val df_temp = df_raw.withColumn("year", $"value".getItem(0).cast(IntegerType)).withColumn("month", $"value".getItem(1).cast(IntegerType)).withColumn("day", $"value".getItem(2).cast(IntegerType)).withColumn("hour", $"value".getItem(3).cast(IntegerType)).withColumn("latitude", $"value".getItem(4)).withColumn("longitude", $"value".getItem(5)).withColumn("elevationDimension", $"value".getItem(6).cast(IntegerType)).withColumn("directionAngle", $"value".getItem(7).cast(IntegerType)).withColumn("speedRate", $"value".getItem(8)).withColumn("ceilingHeightDimension", $"value".getItem(9).cast(IntegerType)).withColumn("distanceDimension", $"value".getItem(10).cast(IntegerType)).withColumn("dewPointTemperature", $"value".getItem(11)).withColumn("airTemperature", $"value".getItem(12))
+
+val unwantedColumns= df_temp.columns.filter (x => x == "value")
+val df_recent = df_temp.drop(unwantedColumns: _*).withColumnRenamed("airTemperature","label")
+
+// save dataframe to file
+df_recent.write.option("header",true).csv("/home/users/hvaheb/bds/bda/exercises/2/out/data")
+//val sampleSize = 0.01 // use 1 percent sample size for debugging!
+//val df = df_temp2.sample(false, sampleSize)
+//size and outline of dataframe
+df_recent.count()
+df_recent.show()
+
+models.transform(df_recent)
+
+val recent_predictions = models.transform(df_recent)
+
+val evaluator = new RegressionEvaluator().setLabelCol("label").setPredictionCol("prediction").setMetricName("rmse")
+val rmse = evaluator.evaluate(recent_predictions)
+println(s"Root Mean Squared Error (RMSE) on recent data = $rmse")
+
+
+
+
+

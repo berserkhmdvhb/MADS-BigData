@@ -1,0 +1,126 @@
+############################################################################################
+Big Data Analytics - Assignment 2
+
+Group 3:
+    Tom Deckenbrunnen
+    Max Sinner
+    Hamed Vaheb
+
+Problem 2
+############################################################################################
+Subtask (a) & (b)
+The goal was to put our data into an appropriate RDD structure so that we could implement
+and train a Regression Tree Model. We used the provided "parse"-function to get the right
+columns for our data. As we intend to convert the RDD to dataframe. Therefore, we need
+to specify a proper schema (column names and types). However, the output of the "parse"
+function is RDD[Array[Any]]. "Any" would be problematic when converting to dataframe as the
+dataframe needs to know the types of its columns. To overcome this issue, as our dataset only 
+contains numbers, we manipulate the "parse" function to ouput RDD[Array[Double]].
+We convert the output RDD to a DataFrame and save it to obviate the need to load it each time.
+
+ Akin to problem 1, The whole procedure we followed for 
+subtask (b) contains 3 phases:
+1. Phase I: Transformers and Estimators*
+2. Phase II: Train, Test, Evaluate
+3. PHASE III: Hyper-parameter Tuning
+
+
+** Phase I: Transformers and Estimators **
+In this phase we define a single transformers, which is "VectorAssembler". 
+and also we define an estimator as the "RandomForestRegressor" model. Each of the 
+aforementioned are explained in what follows:
+
+
+"VectorAssembler": In this dataset we don't have any categorical variable, which implies 
+that we do not need to satisfy the first requirement (mentioned in problem 1). We only 
+need to  satisfy the second requirement, i.e., we need to stack all the columns into a 
+single vector column. "VectorAssembler" does this task.
+
+
+"DecisionTreeClassifier":
+This class defines our estimator model, which is a Random Forest.
+
+
+
+
+** Phase II: Train, Test, Evaluate **
+
+We store all the transformers and estimators defined into a single "stages" 
+array, and we create a pipeline through which we feed the "stages" array using "setStages" 
+method. 
+
+We split our data into train and test by defining conditions, with the train data encompassing 
+the measurements from 1949-2021, the test data the measurements from 2022. We cache both data 
+to prevent repeating calculations. Last but not lest, we define the model with the defined 
+"labels" and "features".
+
+
+The pipline will consist of the following stages: VectorIndexer and our selected 
+model (RandomforestRegressor).
+
+
+
+** PHASE III: Hyper-parameter Tuning **
+
+In order to perform the cross-validation, we define a CrossValidator in which we use our 
+pipeline and a parmetergrid (consisting maxBins nad maxDepth as 
+parameters) and also we specify the number of folds to be 5 using "setNumFolds" method. 
+Using the class we defined, we train our model by fitting class on trainData and also 
+transform it on testData, from which we can fetch the predicted labels. We store the 
+predictions and clean it by dropping unwanted columns and only keeping the required ones.
+
+After fitting the cross-validation model on training data and transform on test data,
+from which we obtain the preidctions, we drop unwanted  and columns again in the predictions 
+dataframe, so that we have a clear representation that we can send to our evaluation function.
+For evaluation metric, we use the RMSE.
+
+For the evaluation of our Random Forest Regressor, we get the following metric:
+
+
+Root Mean Squared Error (RMSE) on test data = 2.4895907187552653
+
+The (for now) used hyperparameters:
+
+Random Forest Regressor:
+maxBins: 50
+numTrees: 20 
+maxDepth: 5
+
+
+
+{"class":"org.apache.spark.ml.regression.RandomForestRegressionModel","timestamp":1651740002322,
+"sparkVersion":"2.4.3","uid":"rfr_173b5b7c4d5f","paramMap":{"maxBins":200,"featuresCol":
+"features","featureSubsetStrategy":"auto","maxDepth":10,"labelCol":"label"},
+"defaultParamMap":{"predictionCol":"prediction","seed":235498149,
+"minInstancesPerNode":1,"cacheNodeIds":false,"maxBins":32,"subsamplingRate":1.0,"featuresCol":"features","impurity":"variance","featureSubsetStrategy":"auto",
+"numTrees":20,"minInfoGain":0.0,"maxMemoryInMB":256,"maxDepth":5,"checkpointInterval":10,
+"labelCol":"label"},"numFeatures":12,"numTrees":20}
+
+We stored the best model saved by cross-validation in a "Best Model" folder.
+
+
+############################################################################################
+Subtask (c)
+
+For subtask (c), we visited NOAA website to obtain recent dataset from 2022 Luxebmourg weather,
+which do not exist in train or test data we had. We parse and load the files and predict the
+recent weathers, and we repor our error. We put the file we used in the folder "NOAA-recent".
+
+
+############################################################################################
+Subtask (d)
+
+For the correlation, we will take the individual correlations between the selected columns
+and our label column, the air temperature.
+
+For this, we create RDDs from our entire dataset, 1 RDD for our label ( air Temperature),
+and 12 sub RDDs for the other columns. In order to compute the correlations, we cast the
+the type of the enrties in the columns to be DoubleType, so that it matches with the column
+type of the labels.
+
+Consequently, we use the Statistics-package to compute correlations between RDDs, using 
+Spearmans correlation. The computed correlations are stored in a list, and rank them from 
+highest to lowest. One additional detail: as we want the highest correlation, we consider
+the absolute value of the correlation, since this could include negative correlations.
+It turns out that dewpointTemperature variable is the most correlated with airTemperature.
+

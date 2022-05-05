@@ -1,0 +1,68 @@
+
+
+///////subtask (d): Correlation ////
+
+
+val models = pipeline.fit(df)
+val dfn = models.transform(df)
+
+
+
+
+
+// correlation matrix
+val Row(coeff1: Matrix) = Correlation.corr(dfn, "features").head
+
+// store columns in "cols"
+val cols = dfn.columns
+
+// as we require correlation between airTempeature and every other column, we need to convert each column to RDD object and store them
+
+// convert the label(airTemperature) to rdd
+val rdd_label= dfn.withColumn("label", col("label").cast(DoubleType)).select("label").rdd.map(_.getDouble(0))
+
+// convert features to rdd
+val rdd_0 = dfn.withColumn(cols(0), col(cols(0)).cast(DoubleType)).select(cols(0)).rdd.map(_.getDouble(0))
+val rdd_1 = dfn.withColumn(cols(1), col(cols(1)).cast(DoubleType)).select(cols(1)).rdd.map(_.getDouble(0))
+val rdd_2 = dfn.withColumn(cols(2), col(cols(2)).cast(DoubleType)).select(cols(2)).rdd.map(_.getDouble(0))
+val rdd_3 = dfn.withColumn(cols(3), col(cols(3)).cast(DoubleType)).select(cols(3)).rdd.map(_.getDouble(0))
+val rdd_4 = dfn.withColumn(cols(4), col(cols(4)).cast(DoubleType)).select(cols(4)).rdd.map(_.getDouble(0))
+val rdd_5 = dfn.withColumn(cols(5), col(cols(5)).cast(DoubleType)).select(cols(5)).rdd.map(_.getDouble(0))
+val rdd_6 = dfn.withColumn(cols(6), col(cols(6)).cast(DoubleType)).select(cols(6)).rdd.map(_.getDouble(0))
+val rdd_7 = dfn.withColumn(cols(7), col(cols(7)).cast(DoubleType)).select(cols(7)).rdd.map(_.getDouble(0))
+val rdd_8 = dfn.withColumn(cols(8), col(cols(8)).cast(DoubleType)).select(cols(8)).rdd.map(_.getDouble(0))
+val rdd_9 = dfn.withColumn(cols(9), col(cols(9)).cast(DoubleType)).select(cols(9)).rdd.map(_.getDouble(0))
+val rdd_10 = dfn.withColumn(cols(10), col(cols(10)).cast(DoubleType)).select(cols(10)).rdd.map(_.getDouble(0))
+val rdd_11 = dfn.withColumn(cols(11), col(cols(11)).cast(DoubleType)).select(cols(11)).rdd.map(_.getDouble(0))
+
+// compute correlation between each column and label.
+val corr_0 = Statistics.corr(rdd_label, rdd_0, "spearman")
+val corr_1 = Statistics.corr(rdd_label, rdd_1, "spearman")
+val corr_2 = Statistics.corr(rdd_label, rdd_2, "spearman")
+val corr_3 = Statistics.corr(rdd_label, rdd_3, "spearman")
+val corr_4 = Statistics.corr(rdd_label, rdd_4, "spearman")
+val corr_5 = Statistics.corr(rdd_label, rdd_5, "spearman")
+val corr_6 = Statistics.corr(rdd_label, rdd_6, "spearman")
+val corr_7 = Statistics.corr(rdd_label, rdd_7, "spearman")
+val corr_8 = Statistics.corr(rdd_label, rdd_8, "spearman")
+val corr_9 = Statistics.corr(rdd_label, rdd_9, "spearman")
+val corr_10 = Statistics.corr(rdd_label, rdd_10, "spearman")
+val corr_11 = Statistics.corr(rdd_label, rdd_11, "spearman")
+
+// store the correlations in a list
+val Correlations = corr_0 :: corr_1 :: corr_2 :: corr_3 :: corr_4 :: corr_5 :: corr_6 :: corr_7 :: corr_8 :: corr_9 :: corr_10 :: corr_11 ::Nil
+
+// since we want to know which one has the highest correlation (may it be negative or positive), we define a map on the Correlations list through which
+// we map each element to its absolute value
+val Correlations_abs = Correlations.map(x => if (x >= 0) x else -x)
+
+// sort columns by correlation
+val SortedCors = Correlations_abs.sortWith(_ > _)
+
+// Fetch he index of column with highest correlation
+val idx = Correlations_abs.zipWithIndex.max._2
+
+// Report the variable with highest correlation with the label (airTemperature) using the index 
+cols(idx)
+// we deduce that the 'dewPointTemperature' variable is the one with most correlation (0.85).
+

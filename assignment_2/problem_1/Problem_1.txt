@@ -1,0 +1,223 @@
+############################################################################################
+Big Data Analytics - Assignment 2
+
+Group 3:
+    Tom Deckenbrunnen
+    Max Sinner
+    Hamed Vaheb
+
+Problem 1
+############################################################################################
+Subtasks (a) (b)
+The code for these subtasks are written in "PredictHeartDisease_a_b" file.
+
+The data of heartDisease is loaded straight into a DataFrame. We define the features as those
+columns that are different from "HeartDisease". Using these features, our aim to predict the 
+"HeartDisease,  which is our target variable. More specifically, we aim at classifying patients 
+as either  "Yes" or "No" which indicates whether they have heart disease or not. For this 
+purpose, we will use Decision Tree and Random Forest models. The whole procedure we followed for 
+subtasks (a) and (b) contain 3 phases:
+1. Phase I: Transformers and Estimators*
+2. Phase II: Train, Test, Evaluate
+3. PHASE III: Hyper-parameter Tuning
+
+Each of the phases will be explained in details in what follows:
+
+
+
+
+** Phase I: Transformers and Estimators **
+
+In this phase we define two transformers, which are "FeatureHasher" and "StringIndexer", 
+and also we define an estimator as the "DecisionTreeClassifier" model. Each of the 
+aforementioned are explained in what follows:
+
+"FeatureHasher": 
+
+We need two satisfy two requirements for our dataset before preceding.
+First Requirement: Since the dataset contains categorical variables, e.g., and these 
+variables  are string in fact, we need to convert them to numerical variables by indexing 
+the values, or in other words, we need add metadat for each column of the dataframe. To 
+achieve this, we can employ the “one-hot” encoding. 
+Second requirement: Since estimator can only receive a single feature, we need to stack 
+all features (either categorical or numerical) into a single column.
+"FeaturesHasher" satisfies both requirements together. It projects a set of categorical or 
+numerical  features into a feature vector of specified dimension (typically substantially 
+smaller than that of  the original feature space). Moreover, categorical features are 
+“one-hot” encoded. One key point  this transformer is that after encoding, it extends the 
+number of features to a large degree. This affects the runtime drastically. We can manually 
+change the extended number of features using the function "setNumFeatures". The default value 
+is 2^18 = 262144. Since later we realized that running a single model using this value 
+takes about 30 minutes, we manipulated it so that it can simultaneously be large enough 
+for having proper complexity (with respect to accuracy as well, and also small enough to 
+reduce the runtime. Our final choice was 2^15 = 32768.
+
+"StringIndexer":
+
+As our label is also a categorical variable, and it is not included in columns regarded 
+as features which will be fed into the "FeatureHasher" we index the "HeartDisease" column  
+as well. Since later that we apply cross-validation on our dataset, the library that we 
+use consider the  target variable as the column in the dataframe that is labeled as "label", 
+through "StringIndexer" we also change the name of the column "HeartDisease" to "label" 
+using the "setOutputCol" function.
+
+"DecisionTreeClassifier":
+
+This class defines our estimator model, which a Decision Tree Classifier.
+
+
+
+
+
+
+
+**Phase II: Train, Test, Evaluate**
+
+In this subtask, store all the transformers and estimators defined into a single "stages" 
+array, and we  create a pipeline through which we feed the "stages" array using  "setStages" 
+method. We split our data into 90% train, 10% test data, and cache this data. The pipline 
+will consist of the following stages: hasher, labelIndexer and our selected 
+model. As for evaluation, the MulticlassClassificationEvaluator() is selected to report 
+AUC (area under curve), 
+precision, and recall. As this class lacks the "accuracy" metrics, we used 
+BinaryClassificationMetrics too only for reporting accuracy.
+
+
+
+
+** PHASE III: Hyper-parameter Tuning **
+
+In order to perform the cross-validation, we define a CrossValidator in which we use our 
+pipeline and the  suggested parmetergrid (consisting  impurity, maxBins, maxDepth as 
+parameters) and also we specify the number of folds to be 5 using "setNumFolds" method. 
+Using the class we defined, we train our model by fitting class on trainData and also 
+transform it on testData, from which we can fetch the predicted labels. We store the 
+predictions and clean it by dropping unwanted columns and only keeping the required ones.
+
+
+
+In what follows, we report error and accuracy using multitude of metrics, and also we 
+reportthe best hyperparameters and parameters obtained from the cross-validation model:
+
+
+** Evaluation **
+Accuracy 
+accuracy: Double = 0.8752668592239106                                         
+
+Test Error = 1 - Accuracy
+Test Error = 0.12473314077608944
+
+areaUnderROC = 0.5878206747488013
+
+areaUnderPR
+Double = 0.17022013597255742
+
+Precision by Threshold:
+
+Threshold: 1.0, Precision: 0.22590139808682855
+Threshold: 0.0, Precision: 0.07795428858470425
+
+Recall by Threshold:
+Threshold: 1.0, Recall: 0.24728151429722112
+Threshold: 0.0, Recall: 1.0
+
+Precision Recall Curve
+(0.0,0.22590139808682855)
+(0.24728151429722112,0.22590139808682855)
+(1.0,0.07795428858470425)
+
+
+** Parameters and Hyperparameters **
+These were the used hyperparameters:
+
+"numFeatures" 32768
+No. of features in featurehasher
+maxDepth: 30
+maxBins: 300
+impurity: entropy
+
+For more details of the BestModel obainted by cross-validation class,
+we saved our "cvModel" in a directory. The "metadata" of the directory
+provides information about the parameters and hyperparameters, which we 
+aslo provide in the following:
+
+{"class":"org.apache.spark.ml.classification.DecisionTreeClassificationModel",
+"timestamp":1650719861499,"sparkVersion":"2.4.3","uid":"dtc_88d2d3167e08",
+"paramMap":{"labelCol":"label","maxBins":300,"featuresCol":"indexedFeatures",
+"impurity":"entropy","maxDepth":30},"defaultParamMap":{"labelCol":"label",
+"seed":159147643,"predictionCol":"prediction","maxBins":32,
+"probabilityCol":"probability","featuresCol":"features",
+"rawPredictionCol":"rawPrediction","minInstancesPerNode":1,
+"cacheNodeIds":false,"checkpointInterval":10,"maxMemoryInMB":256,
+"impurity":"gini","minInfoGain":0.0,"maxDepth":5},"numFeatures":32768,
+"numClasses":2}
+
+We stored the best model saved by cross-validation in a "Best Model" folder.
+
+The runtime was around 4 hours.
+
+
+
+############################################################################################
+Subtask (c)
+
+The code for this subtask is written in "PredictHeartDisease_c" file.
+
+For the Random Forest Classifier, we used the same procedure to define our model and make
+predictions, with the exception that we add an additional parameter for the gridsearch,
+which is the number of trees. Also, we changed the number of features in the "FeatureHasher"
+from 2^15 to 2^10=1024 in order to reduce the runtime. The evaluation metrics stay the same.
+We think that our model suffers from overfitting now, as we have increased its complexity.
+
+** Evaluation
+
+Accuracy 
+accuracy: Double = 0.9143044455544456                                           
+
+Test Error = 1 - Accuracy
+Test Error = 0.08569555444555443
+
+areaUnderROC = 0.0
+
+areaUnderPR
+Double = 0.0
+
+Precision by Threshold:
+
+Threshold: 1.0, Precision: 0.0
+Threshold: 0.0, Precision: 0.0
+
+Recall by Threshold:
+Threshold: 1.0, Recall: 0.0
+Threshold: 0.0, Recall: 0.0
+
+Precision Recall Curve
+(0.0,0.0)
+(0.0,0.0)
+(0.0,0.0)
+
+
+** Parameters and Hyperparameters **
+
+The following parameters and hyperparameters were used:
+
+
+numTrees: 20
+MmxBins: 100
+maxDepth: 30
+impurity: gini
+
+{"class":"org.apache.spark.ml.classification.RandomForestClassificationModel","timestamp":1651745768300,"sparkVersion":"2.4.3","uid":"rfc_08a46cebce87","paramMap":{"numTrees":20,
+"maxDepth":30,"impurity":"gini","labelCol":"label","maxBins":100,
+"featuresCol":"indexedFeatures"},"defaultParamMap":{"numTrees":20,"cacheNodeIds":false,
+"maxDepth":5,"checkpointInterval":10,"minInfoGain":0.0,"impurity":"gini","rawPredictionCol":
+"rawPrediction","labelCol":"label","minInstancesPerNode":1,"maxMemoryInMB":256,"maxBins":32,
+"probabilityCol":"probability","subsamplingRate":1.0,"featuresCol":"features",
+"predictionCol":"prediction","seed":207336481,"featureSubsetStrategy":"auto"},
+"numFeatures":1024,"numClasses":2,"numTrees":20}
+
+
+We stored the best model saved by cross-validation in a "Best Model" folder.
+
+
+The runtime was: 45 minutes 18 s
