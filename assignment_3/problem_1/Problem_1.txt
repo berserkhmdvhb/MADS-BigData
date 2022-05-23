@@ -1,0 +1,157 @@
+############################################################################################
+Big Data Analytics - Assignment 3
+
+Group 3:
+    Tom Deckenbrunnen
+    Max Sinner
+    Hamed Vaheb
+
+Problem 1
+############################################################################################
+Subtask (a) 
+
+We aim at reading the data from the "wiki_movie_plots_deduped.csv" file that is written in 
+a proper format. After defining a suitable schema for our dataframe, we use the 
+"spark.read.option" function to read the CSV file. As the "Plot"
+column occupies more than one line, we add the "option("multiLine",true)" so that this column
+would be detected correctly.
+
+############################################################################################
+Subtask (b)
+
+Since we only need (title, plot) pairs from the dataframe for now, we select the 
+corresponding columns and then convert the selection to a RDD object. We also assure that the 
+plot from the (title, plot) is recognized as a string. Afterwards, we define the NLP pipeline
+which consists of the following stages: "annotators", "tokenize, ssplit, pos, lemma".
+
+We then define a "lemmatized" variable which takes (title, plot) as input and outputs 
+(title, plainTextToLemmas(contents, pipeline)), in which the second component is the 
+lemmatized tokens, i.e., the result of applying the pipeline to the plot, resulting in a 
+sequence of tokens. Using the "lemmatized" we created, we add a "Features" column to our 
+dataframe, which consists of lemmatized tokens. 
+
+
+############################################################################################
+Subtask (c)
+
+For this file, we created a "RUNLSA_c" file, in which we include all the contents for 
+subtask (a) and subtask (b), yet we structure it as a Scala class, which has the main class 
+named "RUNLSA_c", and its input arguments compries 
+<input-directory> <output-directory> <stopwords-directory>
+ 
+The "input-directory" is the path to the "wiki_movie_plots_deduped.csv" file.
+The "output-directory" is the path in which we intend to save the created dataframe as a CSV 
+file.
+The "stopwords-path" is the path to "stopwords" of English language.
+We compiled the jar file of the on"RUNLSA_c" file and ran in terminal. Please adjust your paths
+accordingly in order to execute the following commands in order to compile the class to jar 
+file and then run it:
+
+scalac -classpath $(echo $SPARK_HOME/jars/*.jar ./Jars/*.jar | tr ' ' ':') RUNLSA_c.scala
+
+
+jar -cvf ./RUNLSA_c.jar *.class
+
+spark-submit --class RUNLSA_c --jars ./Jars/breeze_2.12-2.0.jar,
+./Jars/stanford-corenlp-3.9.2.jar,./Jars/stanford-corenlp-3.9.2-models.jar ./RUNLSA_c.jar
+ ./datasets/wiki_pedia_plots/wiki_movie_plots_deduped.csv ./output/runlsa ./stopwords.txt
+
+
+############################################################################################
+Subtask (d)
+
+Using the dataframe created at subtask (b), we select the columns "Title" and "Features", 
+then convert convert them to a RDD.
+ 
+Akin to the functions implemented at the "RunLSA-shell.scala", we apply the pertinent 
+functions with the difference that we put topDocFreqs = 5000 and k = 25 as required.
+In what follows, we compute both term frequency (TF) and document frequency (DF). 
+
+1. TF: We start by passing the RDD to the "docTermsFreq" function,  which computes term 
+frequency of a term via a local aggregation over the documents.
+
+To further reduce the term space, we conduct a word count to filter out infrequent terms 
+(in this case with a document frequency of less than 24). We reach the point at which we 
+have the required vectors ("vecs") that will be used for computing SVD. Finally, we compute 
+the SVD. We also only keep only the top 5000 terms from within all documents.
+
+2. DF: Since we are operating over the partitioned data structure docTermFreqs, we aggregate 
+it and eventually invert the DF values into their IDF counterparts.
+
+The last transformation combines the TF and IDF weights for all terms
+in a document into a sparse vector representation. We call the resulting vector "vecs".
+We then convert it into a RowMatrix format and feed it into the SVD function.
+############################################################################################
+Subtask (e)
+
+The topTermsInTopConcepts and topDocsInTopConcepts is modified such that they compute 
+top-25 terms and the top-25 documents, each under the k = 25 latent concepts, for the above 
+SVD. For reporting genres, we use the same reasoning and codes, with the difference that 
+instead of using "title" and "plot", we select "genre" and "plot".
+############################################################################################
+Subtask (f)
+
+To compute the Cosine measure in the topDocsForTermQuery, we use two approaches:
+
+(i) We use the .columnSimilarities() to compute cosine similarity between columns of "US", and 
+convert it to rowMatrix, and multiply it with "termRowVec".US_normalised
+
+(ii) We take the rows of US, map them such that each row is divided by norm2 of it, then we 
+store it in "US_normalised". But then we need to aggregate all rows into a RowMatrix again.
+This part became problematic so we used the first approach. However, we kept our thought
+process in the code. 
+
+
+
+In what follows, I will present 5 test cases for terms that we obtained the topDocsForTermQuery:
+
+Case 1.
+val terms = List(" justice", " crime")
+
+val queryVec = termsToQueryVector(terms, idTerms, idfs)
+queryVec: breeze.linalg.SparseVector[Double] = SparseVector(5000)((18,5.053668982431772), (1694,3.7845896365042564))
+
+topDocsForTermQuery(US, svd.V, queryVec)
+res7: Seq[(Double, Long)] = WrappedArray((0.3069112854053451,20769), (0.2797034639612229,8365), (0.266806905627588,22918), (0.2650469867858211,29339), (0.2559255006240375,20960), (0.25283237041184475,8871), (0.24999718580217756,9273), (0.24999718580217756,9073), (0.2303011673913496,20574), (0.22721480816216721,20477))
+
+Case 2.
+val terms = List(" depression", " accident")
+
+val queryVec = termsToQueryVector(terms, idTerms, idfs)
+queryVec: breeze.linalg.SparseVector[Double] = SparseVector(5000)((30,5.873731682211374), (32,3.8116416458427373))
+
+topDocsForTermQuery(US, svd.V, queryVec)
+res15: Seq[(Double, Long)] = WrappedArray((0.1412477601530738,6632), (0.10525591308831339,5454), (0.10525591308831339,5254), (0.08035802028907224,26537), (0.07408499916588394,18820), (0.07308544523219548,468), (0.07078100685537662,1412), (0.0689823015711965,7670), (0.06773872244350557,23644), (0.06582820951913147,18833))
+
+Case 3. 
+val terms = List(" love", " hurt")
+
+val queryVec = termsToQueryVector(terms, idTerms, idfs)
+queryVec: breeze.linalg.SparseVector[Double] = SparseVector(5000)((586,2.126929580364733), (900,4.825286652261283))
+
+topDocsForTermQuery(US, svd.V, queryVec)
+res19: Seq[(Double, Long)] = WrappedArray((0.7342262496684581,27158), (0.709023537896289,8127), (0.6603934602085474,4044), (0.6209097131359604,9416), (0.5525076501536481,14296), (0.537432006211143,499), (0.5272656114015923,13189), (0.5242154117728859,6660), (0.5228543386947242,12977), (0.5197911019563868,5420))
+
+Case 4.
+val terms = List(" alexander", " snake")
+
+
+val queryVec = termsToQueryVector(terms, idTerms, idfs)
+breeze.linalg.SparseVector[Double] = SparseVector(5000)((8,6.170630409768078), (26,5.985227186436716))
+
+topDocsForTermQuery(US, svd.V, queryVec)
+Seq[(Double, Long)] = WrappedArray((0.047004580409702755,27449), (0.03778036732352975,1586), (0.03778036732352975,1386), (0.03778036732352975,1186), (0.03778036732352975,986), (0.0320618984796984,6684), (0.03186214061161518,22888), (0.03153941662738865,22489), (0.031192351690052432,3812), (0.031192351690052432,3612))
+
+Case 5. 
+val terms = List(" barrymore", " kingdom")
+
+val queryVec = termsToQueryVector(terms, idTerms, idfs)
+queryVec: breeze.linalg.SparseVector[Double] = SparseVector(5000)((44,7.068572002974037), (52,5.171452018088155))
+
+topDocsForTermQuery(US, svd.V, queryVec)
+res33: Seq[(Double, Long)] = WrappedArray((0.3652357758732682,6784), (0.3652357758732682,6584), (0.3652357758732682,6384), (0.3652357758732682,6184), (0.3269744042668793,3261), (0.3269744042668793,3061), (0.3269744042668793,2861), (0.3269744042668793,2661), (0.2867198369184582,14164), (0.2708693533771764,9967))
+
+
+
+The runtime for doing all the stpes were:
+57 min 52 s
