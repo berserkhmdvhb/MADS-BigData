@@ -1,0 +1,101 @@
+####################################################################################
+Big Data Analytics - Assignment 4 - Problem 3                                      
+
+Group 3:
+    - Tom Deckenbrunnen
+    - Max Sinner
+    - Hamed Vaheb
+####################################################################################
+General Information about the Dataset and the intentions for this task
+
+used dataset: https://archive.ics.uci.edu/ml/datasets/HIGGS
+
+Synthetic dataset, well described on the website, clean with no missing values,
+balanced
+
+Aims:
+- Perform classification
+- compare at least two different models for the classification:
+    - Random Decision Forest
+    - Multilayer Perceptron (only NN available in Spark MlLib)
+- Use hyperparameter tuning to select a good combination of parameters
+
+####################################################################################
+How to run the provided code:
+
+cd into the directory containing the source file problem3-shell.scala
+adjust the variable in line 35 of the code to contain path pointing to the directory
+containing the csv FROM the current directory
+
+We have run the code from within the directory with the source file using:
+cat ./problem3-shell.scala | spark-shell --driver-memory 10g
+
+
+####################################################################################
+------------------------- Inspection -----------------------------------------------
+
+A first step in the data inspection is to look at the description provided by the
+creators of the dataset. There are 29 columns in total, the first one being the
+label (either the signal (1) or background noise (0)) and the other 28 are
+all features. All values are double, hence there are only numerical features.
+Moreover, there are no missing values, saving quite a few steps in preprocessing.
+Last but not least, a count by label reveals that the dataset is more or less balanced
+wrt the two classes.
+
+------------------------- Preprocessing --------------------------------------------
+
+Thanks to the fact that the data is clean, balanced, and the features only consist
+of doubles, this step is straightforward. It simply consists in applying a
+0.9/0.1 random split to create our train and test sets.
+
+------------------------- Model Selection ------------------------------------------
+
+Since the goal set at the start was to compare the performance of two models
+using different mechanisms, the choice fell on a random forest classifier and
+a multilayer perceptron classifier. The latter was chosen as the only available
+model in MlLib based on neural networks.
+
+------------------------- Pipeline Construction ------------------------------------
+To facilitate the code, the modular pipeline api offered by the Spark MlLib is used.
+The pipelines consist of the following:
+-VectorAssembler for the features
+-Estimator, ie. our models (RF, MLP)
+
+We then add a binary classification evaluator, setting the desired metric to AUC.
+Then, parametergrids for both models are defined. These may or may not be
+reasonably chosen.
+
+Finally, these components are put together into two separate crossvalidators
+performing 5-fold crossvalidation over the defined parametergrids.
+The best models are retained and used for the evaluation.
+
+------------------------- Evaluation -----------------------------------------------
+We record both AUC and accuracy measured on the test data:
+
+AUC_RF  = 0.79
+AUC_MLP  = 0.70
+ACC_RF  = 0.71
+ACC_MLP = 0.65
+
+These values are, to say the least, underwhelming.
+An obvious, and very much possible reason for this, is the ill-defined
+parametergrid. Perhaps a dfferent set of layers for the MLP, more trees, more depth
+for the RF, might have given better performance. It is also possible that some of
+the features are not independent (which would require more time that we do not have)
+and thus cannot be properly separated during training. Maybe some features are not
+important enough and act as noise instead of actually providing information to the
+model. The random forest classifier would allow extraction of the more important
+features. One could then disregard the least important ones and retrain a model
+using only the retained features.
+------------------------------------------------------------------------------------
+The code here was run on a local machine. The reason for that is that we did not
+have enough time to properly figure out the configuration on the cluster to use
+bigmem nodes, set the driver memory, the executor node memory...
+For that reason, instead of the 7GB of the full dataset, we only used 0.5% of the
+whole, which still amounts to ~350MB worth of data.
+
+The following were the recorded runtimes:
+
+Runtime for the whole script:                               1h 44 min 14 s
+Time for random forest crossvalidation:                        52 min 35 s
+Time for multilayer perceptron crossvalidation:                47 min 40 s
